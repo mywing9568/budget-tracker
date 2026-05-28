@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💰 가계부 자동 계산기</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f0f4ff; color: #1e1e2e; min-height: 100vh; }
+
+  header {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: white; padding: 18px 16px 14px;
+    text-align: center;
+  }
+  header h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.3px; }
+  header p { font-size: 0.75rem; opacity: 0.8; margin-top: 2px; }
+
+  /* 요약 바 */
+  .summary {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    background: white; border-bottom: 1px solid #e8eaf6;
+    box-shadow: 0 2px 8px rgba(79,70,229,0.08);
+  }
+  .summary-item { padding: 12px 8px; text-align: center; }
+  .summary-item:not(:last-child) { border-right: 1px solid #f0f0f5; }
+  .summary-label { font-size: 0.65rem; color: #888; margin-bottom: 4px; }
+  .summary-value { font-size: 1rem; font-weight: 700; }
+  .income { color: #2563eb; }
+  .expense { color: #dc2626; }
+  .balance { color: #7c3aed; }
+  .balance.negative { color: #dc2626; }
+
+  /* 입력 폼 */
+  .form-section {
+    background: white; margin: 12px; border-radius: 14px;
+    padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  .form-section h2 { font-size: 0.85rem; font-weight: 600; color: #4f46e5; margin-bottom: 12px; }
+
+  .form-row { margin-bottom: 10px; }
+  .form-row label { font-size: 0.72rem; color: #555; display: block; margin-bottom: 4px; font-weight: 500; }
+  .form-row input, .form-row select {
+    width: 100%; padding: 9px 12px; border: 1.5px solid #e5e7eb;
+    border-radius: 8px; font-size: 0.88rem; outline: none; transition: border 0.2s;
+    background: #fafafa;
+  }
+  .form-row input:focus, .form-row select:focus { border-color: #4f46e5; background: white; }
+
+  .type-toggle { display: flex; gap: 8px; }
+  .type-btn {
+    flex: 1; padding: 9px; border: 1.5px solid #e5e7eb; border-radius: 8px;
+    background: #fafafa; font-size: 0.85rem; cursor: pointer; font-weight: 500;
+    transition: all 0.2s;
+  }
+  .type-btn.active-income { background: #eff6ff; border-color: #2563eb; color: #2563eb; }
+  .type-btn.active-expense { background: #fff1f2; border-color: #dc2626; color: #dc2626; }
+
+  .btn-add {
+    width: 100%; padding: 12px; background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: white; border: none; border-radius: 10px; font-size: 0.95rem;
+    font-weight: 600; cursor: pointer; margin-top: 4px; transition: opacity 0.2s;
+  }
+  .btn-add:hover { opacity: 0.9; }
+  .btn-add:active { opacity: 0.8; }
+
+  /* 내역 */
+  .list-section {
+    background: white; margin: 0 12px 12px; border-radius: 14px;
+    padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .list-header h2 { font-size: 0.85rem; font-weight: 600; color: #4f46e5; }
+  .btn-csv {
+    padding: 6px 12px; background: #f0fdf4; border: 1.5px solid #22c55e;
+    color: #16a34a; border-radius: 8px; font-size: 0.75rem; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-csv:hover { background: #dcfce7; }
+
+  .empty-state { text-align: center; padding: 24px 0; color: #aaa; font-size: 0.82rem; }
+
+  .entry-item {
+    display: flex; align-items: center; padding: 10px 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .entry-item:last-child { border-bottom: none; }
+  .entry-cat {
+    width: 32px; height: 32px; border-radius: 8px; display: flex;
+    align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0;
+  }
+  .entry-info { flex: 1; margin-left: 10px; }
+  .entry-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .entry-name { font-size: 0.85rem; font-weight: 600; }
+  .entry-amount { font-size: 0.95rem; font-weight: 700; }
+  .entry-amount.income { color: #2563eb; }
+  .entry-amount.expense { color: #dc2626; }
+  .entry-bottom { display: flex; justify-content: space-between; margin-top: 2px; }
+  .entry-meta { font-size: 0.7rem; color: #999; }
+  .btn-del {
+    background: none; border: none; color: #ddd; font-size: 1rem;
+    cursor: pointer; padding: 4px 6px; margin-left: 6px; flex-shrink: 0;
+    transition: color 0.2s;
+  }
+  .btn-del:hover { color: #dc2626; }
+
+  /* 카테고리 색상 */
+  .cat-식비 { background: #fff7ed; }
+  .cat-교통 { background: #eff6ff; }
+  .cat-쇼핑 { background: #fdf4ff; }
+  .cat-급여 { background: #f0fdf4; }
+  .cat-의료 { background: #fff1f2; }
+  .cat-문화 { background: #fefce8; }
+  .cat-기타 { background: #f9fafb; }
+  .cat-저축 { background: #f0fdfa; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💰 가계부 자동 계산기</h1>
+  <p>수입·지출을 입력하면 잔액을 자동 계산해요</p>
+</header>
+
+<!-- 요약 바 -->
+<div class="summary">
+  <div class="summary-item">
+    <div class="summary-label">💙 총 수입</div>
+    <div class="summary-value income" id="totalIncome">₩0</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-label">❤️ 총 지출</div>
+    <div class="summary-value expense" id="totalExpense">₩0</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-label">💜 잔액</div>
+    <div class="summary-value balance" id="balance">₩0</div>
+  </div>
+</div>
+
+<!-- 입력 폼 -->
+<div class="form-section">
+  <h2>✏️ 항목 추가</h2>
+  <div class="form-row">
+    <label>날짜</label>
+    <input type="date" id="inputDate">
+  </div>
+  <div class="form-row">
+    <label>구분</label>
+    <div class="type-toggle">
+      <button class="type-btn active-income" id="btnIncome" onclick="setType('income')">💙 수입</button>
+      <button class="type-btn" id="btnExpense" onclick="setType('expense')">❤️ 지출</button>
+    </div>
+  </div>
+  <div class="form-row">
+    <label>카테고리</label>
+    <select id="inputCat">
+      <option value="급여">💼 급여</option>
+      <option value="식비">🍚 식비</option>
+      <option value="교통">🚌 교통</option>
+      <option value="쇼핑">🛍️ 쇼핑</option>
+      <option value="의료">💊 의료</option>
+      <option value="문화">🎬 문화</option>
+      <option value="저축">🏦 저축</option>
+      <option value="기타">📦 기타</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label>금액 (원)</label>
+    <input type="number" id="inputAmount" placeholder="예) 50000" min="0">
+  </div>
+  <div class="form-row">
+    <label>메모 (선택)</label>
+    <input type="text" id="inputMemo" placeholder="예) 마트 장보기">
+  </div>
+  <button class="btn-add" onclick="addEntry()">+ 항목 추가하기</button>
+</div>
+
+<!-- 내역 리스트 -->
+<div class="list-section">
+  <div class="list-header">
+    <h2>📋 내역</h2>
+    <button class="btn-csv" onclick="downloadCSV()">📥 CSV 저장</button>
+  </div>
+  <div id="entryList">
+    <div class="empty-state">아직 입력된 내역이 없어요<br>위에서 첫 항목을 추가해 보세요 🙂</div>
+  </div>
+</div>
+
+<script>
+  const CAT_EMOJI = {
+    급여:'💼', 식비:'🍚', 교통:'🚌', 쇼핑:'🛍️',
+    의료:'💊', 문화:'🎬', 저축:'🏦', 기타:'📦'
+  };
+
+  let entries = JSON.parse(localStorage.getItem('budget_entries') || '[]');
+  let currentType = 'income';
+
+  // 오늘 날짜 기본값
+  document.getElementById('inputDate').value = new Date().toISOString().slice(0,10);
+
+  function setType(t) {
+    currentType = t;
+    const bi = document.getElementById('btnIncome');
+    const be = document.getElementById('btnExpense');
+    if (t === 'income') {
+      bi.className = 'type-btn active-income';
+      be.className = 'type-btn';
+      // 카테고리를 수입 위주로
+      document.getElementById('inputCat').value = '급여';
+    } else {
+      bi.className = 'type-btn';
+      be.className = 'type-btn active-expense';
+      document.getElementById('inputCat').value = '식비';
+    }
+  }
+
+  function fmt(n) {
+    return '₩' + Number(n).toLocaleString('ko-KR');
+  }
+
+  function addEntry() {
+    const date = document.getElementById('inputDate').value;
+    const cat  = document.getElementById('inputCat').value;
+    const amt  = parseInt(document.getElementById('inputAmount').value);
+    const memo = document.getElementById('inputMemo').value.trim();
+
+    if (!date) { alert('날짜를 선택해 주세요.'); return; }
+    if (!amt || amt <= 0) { alert('금액을 올바르게 입력해 주세요.'); return; }
+
+    entries.unshift({ id: Date.now(), date, type: currentType, cat, amt, memo });
+    save();
+    render();
+
+    document.getElementById('inputAmount').value = '';
+    document.getElementById('inputMemo').value = '';
+  }
+
+  function deleteEntry(id) {
+    entries = entries.filter(e => e.id !== id);
+    save();
+    render();
+  }
+
+  function save() {
+    localStorage.setItem('budget_entries', JSON.stringify(entries));
+  }
+
+  function render() {
+    const totalIncome  = entries.filter(e => e.type === 'income').reduce((s,e) => s+e.amt, 0);
+    const totalExpense = entries.filter(e => e.type === 'expense').reduce((s,e) => s+e.amt, 0);
+    const bal = totalIncome - totalExpense;
+
+    document.getElementById('totalIncome').textContent  = fmt(totalIncome);
+    document.getElementById('totalExpense').textContent = fmt(totalExpense);
+    const balEl = document.getElementById('balance');
+    balEl.textContent = fmt(bal);
+    balEl.className = 'summary-value balance' + (bal < 0 ? ' negative' : '');
+
+    const list = document.getElementById('entryList');
+    if (entries.length === 0) {
+      list.innerHTML = '<div class="empty-state">아직 입력된 내역이 없어요<br>위에서 첫 항목을 추가해 보세요 🙂</div>';
+      return;
+    }
+
+    list.innerHTML = entries.map(e => `
+      <div class="entry-item">
+        <div class="entry-cat cat-${e.cat}">${CAT_EMOJI[e.cat]||'📦'}</div>
+        <div class="entry-info">
+          <div class="entry-top">
+            <span class="entry-name">${e.cat}${e.memo ? ' · ' + e.memo : ''}</span>
+            <span class="entry-amount ${e.type}">${e.type==='income'?'+':'-'}${fmt(e.amt)}</span>
+          </div>
+          <div class="entry-bottom">
+            <span class="entry-meta">${e.date}</span>
+            <span class="entry-meta">${e.type==='income'?'💙 수입':'❤️ 지출'}</span>
+          </div>
+        </div>
+        <button class="btn-del" onclick="deleteEntry(${e.id})" title="삭제">✕</button>
+      </div>
+    `).join('');
+  }
+
+  function downloadCSV() {
+    if (entries.length === 0) { alert('저장할 내역이 없어요.'); return; }
+    const header = '날짜,구분,카테고리,금액,메모';
+    const rows = entries.map(e =>
+      `${e.date},${e.type==='income'?'수입':'지출'},${e.cat},${e.amt},"${e.memo||''}"`
+    );
+    const csv = '\uFEFF' + [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `가계부_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }
+
+  render();
+</script>
+</body>
+</html>
